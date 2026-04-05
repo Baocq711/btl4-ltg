@@ -3,6 +3,7 @@
 A Python implementation of Quoridor focused on course-delivery priorities: correct core rules first, local play and AI second, online MVP third.
 
 ## Included
+
 - Shared core engine for local, AI, save/load, and online.
 - Local pygame client with main menu, new game presets, Continue, Save, pause overlay, and non-blocking local AI turns and async wall preview calculation.
 - AI implementations: Random, Minimax for 2-player mode, and MCTS for multiplayer mode.
@@ -10,6 +11,7 @@ A Python implementation of Quoridor focused on course-delivery priorities: corre
 - Unit tests for core rules, AI legality, and room lifecycle.
 
 ## Project Layout
+
 - `quoridor/core`: state, actions, rules, pathfinding, serialization.
 - `quoridor/ai`: random, minimax, MCTS, action pruning, heuristics.
 - `quoridor/client`: pygame application and online websocket session.
@@ -18,6 +20,7 @@ A Python implementation of Quoridor focused on course-delivery priorities: corre
 - `tests`: unit tests.
 
 ## Requirements
+
 Install dependencies in a local environment:
 
 ```bash
@@ -25,15 +28,41 @@ python -m pip install -r requirements.txt
 ```
 
 Required runtime packages:
+
 - `pygame`
 - `websockets`
 
+## Client Configuration
+
+The client reads default values for the server URL and player name from
+`config.json` in the working directory (or project root). Command-line
+arguments override the config file, and both override the built-in defaults.
+
+Priority: **CLI argument > config.json > built-in default** (`ws://127.0.0.1:8765`)
+
+### config.json
+
+```json
+{
+  "server_url": "ws://192.168.1.5:8765",
+  "player_name": "Alice"
+}
+```
+
+### Command-line arguments
+
+```bash
+python scripts/run_client.py --server ws://192.168.1.5:8765 --name Alice
+```
+
 ## Run Local Client
+
 ```bash
 python scripts/run_client.py
 ```
 
 Menu presets include:
+
 - `Local 2P`
 - `Local 4P`
 - `Vs Random`
@@ -43,6 +72,7 @@ Menu presets include:
 - `Online`
 
 ## Controls
+
 - Left click highlighted cells to move.
 - Use `Move`, `Wall H`, and `Wall V` buttons to switch action type.
 - Press `Esc` to open the pause overlay.
@@ -50,6 +80,7 @@ Menu presets include:
 - `Continue` loads the most recent local save.
 
 ## Run Online MVP
+
 Start the server:
 
 ```bash
@@ -63,24 +94,27 @@ python scripts/run_client.py
 ```
 
 On the online screen:
+
 - Enter a server URL, name, and optional room code.
+- Use Ctrl+A, Ctrl+C, Ctrl+V, and Ctrl+X in the online menu inputs to select, copy, paste, and cut.
 - Leave room code blank to create a new room.
 - Share the generated room code with the other players.
 - After 4 players join, each player presses `Ready`.
 
 ## Run Self-Play
+
 ```bash
 python scripts/selfplay.py --turn-limit 120
 ```
 
 ## Run Tests
+
 ```bash
 python -m unittest discover -s tests -v
 ```
 
 ## Notes
+
 - Minimax is intentionally limited to 2-player games.
 - Save/Continue is intentionally local-only.
 - The online mode is an MVP: it has no reconnect, persistence, login, or anti-cheat beyond authoritative validation.
-
-

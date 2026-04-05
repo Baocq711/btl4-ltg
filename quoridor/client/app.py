@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,6 +47,26 @@ from quoridor.core import (
 from quoridor.core.serializer import state_from_dict
 
 
+_DEFAULT_SERVER_URL = "ws://127.0.0.1:8765"
+_DEFAULT_PLAYER_NAME = "Player"
+
+
+def _load_external_config() -> dict[str, str]:
+    """Load config.json from next to the executable or the project root."""
+    candidates = [
+        Path.cwd() / "config.json",
+        Path(__file__).resolve().parents[2] / "config.json",
+    ]
+    for path in candidates:
+        if path.is_file():
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+    return {}
+
+
 @dataclass(frozen=True)
 class LocalPreset:
     label: str
@@ -64,7 +85,7 @@ PRESETS = {
 
 
 class QuoridorApp:
-    def __init__(self) -> None:
+    def __init__(self, server_url: str | None = None, player_name: str | None = None) -> None:
         try:
             import pygame
         except ImportError as exc:  # pragma: no cover - runtime dependency
@@ -73,6 +94,12 @@ class QuoridorApp:
         self.pg = pygame
         self.pg.init()
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.clipboard_enabled = False
+        try:
+            self.pg.scrap.init()
+            self.clipboard_enabled = True
+        except self.pg.error:
+            self.clipboard_enabled = False
         pygame.display.set_caption("Quoridor 4P")
         self.clock = pygame.time.Clock()
         self.title_font = pygame.font.SysFont("georgia", 38)
@@ -96,11 +123,89 @@ class QuoridorApp:
         self._manual_action_pending_token: tuple[int, int, int, str] | None = None
         self._manual_action_cache_key: tuple[int, int, int, str] | None = None
         self._manual_action_cache: list[MovePawnAction | PlaceWallAction] = []
+        _cfg = _load_external_config()
+        _server = server_url or _cfg.get("server_url") or _DEFAULT_SERVER_URL
+        _name = player_name or _cfg.get("player_name") or _DEFAULT_PLAYER_NAME
         self.text_inputs: dict[str, TextInput] = {
-            "server": TextInput(pygame.Rect(520, 250, 300, 44), "ws://127.0.0.1:8765", "Server URL"),
-            "name": TextInput(pygame.Rect(520, 320, 300, 44), "Player", "Player Name"),
+            "server": TextInput(pygame.Rect(520, 250, 300, 44), _server, "Server URL"),
+            "name": TextInput(pygame.Rect(520, 320, 300, 44), _name, "Player Name"),
             "room": TextInput(pygame.Rect(520, 390, 300, 44), "", "Room Code (blank to create)"),
         }
+
+    def _set_active_text_input(self, target_name: str | None) -> None:
+        for name, text_input in self.text_inputs.items():
+            text_input.set_active(name == target_name, select_all=name == target_name)
+
+    def _active_text_input(self) -> TextInput | None:
+        for text_input in self.text_inputs.values():
+            if text_input.active:
+                return text_input
+        return None
+
+    def _focus_next_text_input(self) -> None:
+        names = list(self.text_inputs.keys())
+        for index, name in enumerate(names):
+            if self.text_inputs[name].active:
+                next_name = names[(index + 1) % len(names)]
+                self._set_active_text_input(next_name)
+                return
+        if names:
+            self._set_active_text_input(names[0])
+
+    def _clipboard_put(self, text: str) -> bool:
+        if not self.clipboard_enabled:
+            return False
+        try:
+            self.pg.scrap.put(self.pg.SCRAP_TEXT, text.encode("utf-8") + b"\x00")
+            return True
+        except self.pg.error:
+            return False
+
+    def _clipboard_get(self) -> str:
+        if not self.clipboard_enabled:
+            return ""
+        try:
+            data = self.pg.scrap.get(self.pg.SCRAP_TEXT)
+        except self.pg.error:
+            return ""
+        if not data:
+            return ""
+        if isinstance(data, bytes):
+            return data.decode("utf-8", errors="ignore").replace("\x00", "").replace("\r", "").replace("\n", "")
+        return str(data).replace("\x00", "").replace("\r", "").replace("\n", "")
+
+    def _handle_online_input_shortcuts(self, text_input: TextInput, event: object) -> bool:
+        if event.key == self.pg.K_TAB:
+            self._focus_next_text_input()
+            return True
+
+        ctrl_pressed = bool(event.mod & self.pg.KMOD_CTRL)
+        if not ctrl_pressed:
+            return False
+
+        if event.key == self.pg.K_a:
+            text_input.select_all()
+            self.status = f"Selected {text_input.name}."
+            return True
+        if event.key == self.pg.K_c:
+            self.status = f"Copied {text_input.name}." if self._clipboard_put(text_input.value) else "Clipboard unavailable."
+            return True
+        if event.key == self.pg.K_x:
+            if self._clipboard_put(text_input.value):
+                text_input.clear()
+                self.status = f"Cut {text_input.name}."
+            else:
+                self.status = "Clipboard unavailable."
+            return True
+        if event.key == self.pg.K_v:
+            pasted = self._clipboard_get()
+            if pasted:
+                text_input.paste_text(pasted)
+                self.status = f"Pasted into {text_input.name}."
+            else:
+                self.status = "Clipboard empty or unavailable."
+            return True
+        return False
 
     def run(self) -> None:
         while self.running:
@@ -234,8 +339,12 @@ class QuoridorApp:
 
     def _handle_online_menu_event(self, event: object) -> None:
         if event.type == self.pg.MOUSEBUTTONDOWN and event.button == 1:
-            for text_input in self.text_inputs.values():
-                text_input.active = text_input.rect.collidepoint(event.pos)
+            clicked_name = None
+            for name, text_input in self.text_inputs.items():
+                if text_input.rect.collidepoint(event.pos):
+                    clicked_name = name
+                    break
+            self._set_active_text_input(clicked_name)
             for button in self._online_menu_buttons():
                 if not button.hit(event.pos):
                     continue
@@ -245,8 +354,12 @@ class QuoridorApp:
                     self._return_to_menu()
                 return
         elif event.type == self.pg.KEYDOWN:
-            for text_input in self.text_inputs.values():
-                text_input.handle_key(event)
+            active_input = self._active_text_input()
+            if active_input is None:
+                return
+            if self._handle_online_input_shortcuts(active_input, event):
+                return
+            active_input.handle_key(event)
 
     def _handle_online_lobby_event(self, event: object) -> None:
         if event.type != self.pg.MOUSEBUTTONDOWN or event.button != 1:
@@ -495,7 +608,8 @@ class QuoridorApp:
 
     def _draw_input(self, text_input: TextInput) -> None:
         color = HIGHLIGHT if text_input.active else PANEL_BORDER
-        self.pg.draw.rect(self.screen, PANEL, text_input.rect, border_radius=6)
+        fill = (231, 241, 236) if text_input.selected else PANEL
+        self.pg.draw.rect(self.screen, fill, text_input.rect, border_radius=6)
         self.pg.draw.rect(self.screen, color, text_input.rect, width=2, border_radius=6)
         self._draw_text(text_input.name, (text_input.rect.x, text_input.rect.y - 24), self.small_font)
         self._draw_text(text_input.value or "", (text_input.rect.x + 12, text_input.rect.y + 10), self.body_font)
@@ -509,6 +623,7 @@ class QuoridorApp:
     def _draw_online_menu(self) -> None:
         self._draw_text("Online Setup", (460, 120), self.title_font)
         self._draw_text("Join an existing room code or leave it blank to create one.", (320, 170), self.body_font)
+        self._draw_text("Tip: click a field, then use Ctrl+A / Ctrl+C / Ctrl+V / Ctrl+X.", (315, 205), self.small_font)
         for text_input in self.text_inputs.values():
             self._draw_input(text_input)
         for button in self._online_menu_buttons():
@@ -662,8 +777,10 @@ class QuoridorApp:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Quoridor pygame client.")
-    parser.parse_args()
-    QuoridorApp().run()
+    parser.add_argument("--server", default=None, help="WebSocket server URL (e.g. ws://192.168.1.5:8765)")
+    parser.add_argument("--name", default=None, help="Default player name")
+    args = parser.parse_args()
+    QuoridorApp(server_url=args.server, player_name=args.name).run()
 
 
 if __name__ == "__main__":

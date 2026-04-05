@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -54,7 +55,7 @@ class CoreRulesTests(unittest.TestCase):
         self.assertEqual(next_state.move_count, 1)
         self.assertIsNone(check_winner(next_state))
 
-        save_path = Path("d:/Hoc/BTL/LTG/4/codex/saves/test_save.json")
+        save_path = Path(tempfile.gettempdir()) / "quoridor_test_save.json"
         save_game(next_state, save_path)
         loaded = load_game(save_path)
         self.assertEqual(loaded.current_turn, next_state.current_turn)

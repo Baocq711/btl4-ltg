@@ -13,4 +13,7 @@ from quoridor.server.server import serve
 if __name__ == "__main__":
     host = os.getenv("QUORIDOR_HOST", "127.0.0.1")
     port = int(os.getenv("QUORIDOR_PORT", "8765"))
-    asyncio.run(serve(host=host, port=port))
+    try:
+        asyncio.run(serve(host=host, port=port))
+    except KeyboardInterrupt:
+        print("\nServer stopped.")

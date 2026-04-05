@@ -30,9 +30,13 @@ class QuoridorServer:
     async def handle_message(self, websocket: Any, payload: dict[str, object]) -> None:
         message_type = payload.get("type")
         if message_type == "join_room":
+            num_players = int(payload.get("num_players", 4))
+            if num_players not in (2, 4):
+                num_players = 4
             room, participant = self.room_manager.join_room(
                 str(payload.get("room_id", "")),
                 str(payload.get("player_name", "Player")),
+                max_players=num_players,
             )
             self.connections[websocket] = (room.room_id, participant.player_id)
             self.room_connections[room.room_id].add(websocket)
@@ -44,7 +48,12 @@ class QuoridorServer:
                     "player_id": participant.player_id,
                     "player_name": participant.name,
                     "seat_count": len(room.players),
+                    "max_players": room.max_players,
                 },
+            )
+            await self.broadcast(
+                room.room_id,
+                {"type": "player_joined", "seat_count": len(room.players)},
             )
             return
 
@@ -84,6 +93,8 @@ class QuoridorServer:
                     await self.handle_message(websocket, payload)
                 except json.JSONDecodeError:
                     await self.send_json(websocket, {"type": "error", "message": "Invalid JSON payload."})
+        except Exception:  # noqa: BLE001 – handle abrupt disconnects gracefully
+            pass
         finally:
             connection = self.connections.pop(websocket, None)
             if connection is None:

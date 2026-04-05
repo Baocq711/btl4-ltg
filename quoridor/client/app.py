@@ -116,6 +116,8 @@ class QuoridorApp:
         self.online_room_id = ""
         self.online_started = False
         self.online_seat_count = 0
+        self.online_num_players = 4
+        self.online_max_players = 4
         self.ai_worker = AIWorker()
         self.preview_worker = ManualActionWorker()
         self._session_id = 0
@@ -126,10 +128,10 @@ class QuoridorApp:
         _cfg = _load_external_config()
         _server = server_url or _cfg.get("server_url") or _DEFAULT_SERVER_URL
         _name = player_name or _cfg.get("player_name") or _DEFAULT_PLAYER_NAME
+        self._server_url = _server
         self.text_inputs: dict[str, TextInput] = {
-            "server": TextInput(pygame.Rect(520, 250, 300, 44), _server, "Server URL"),
-            "name": TextInput(pygame.Rect(520, 320, 300, 44), _name, "Player Name"),
-            "room": TextInput(pygame.Rect(520, 390, 300, 44), "", "Room Code (blank to create)"),
+            "name": TextInput(pygame.Rect(520, 250, 300, 44), _name, "Player Name"),
+            "room": TextInput(pygame.Rect(520, 320, 300, 44), "", "Room Code (blank to create)"),
         }
 
     def _set_active_text_input(self, target_name: str | None) -> None:
@@ -284,11 +286,13 @@ class QuoridorApp:
         self.online_started = False
         self.online_room_id = ""
         self.online_seat_count = 0
+        self.online_max_players = self.online_num_players
         self.local_player_id = None
         self.online_session = OnlineSession(
-            server_url=self.text_inputs["server"].value.strip(),
+            server_url=self._server_url,
             player_name=self.text_inputs["name"].value.strip() or "Player",
             room_id=self.text_inputs["room"].value.strip().upper(),
+            num_players=self.online_num_players,
         )
         self.online_session.connect()
         self.scene = "online_lobby"
@@ -352,6 +356,8 @@ class QuoridorApp:
                     self._connect_online()
                 elif button.action == "back_menu":
                     self._return_to_menu()
+                elif button.action == "toggle_players":
+                    self.online_num_players = 2 if self.online_num_players == 4 else 4
                 return
         elif event.type == self.pg.KEYDOWN:
             active_input = self._active_text_input()
@@ -369,7 +375,7 @@ class QuoridorApp:
                 continue
             if button.action == "ready" and self.online_session is not None:
                 self.online_session.send_ready()
-                self.status = "Ready sent. Waiting for all 4 players..."
+                self.status = f"Ready sent. Waiting for all {self.online_max_players} players..."
             elif button.action == "back_menu":
                 self._return_to_menu()
             return
@@ -438,8 +444,11 @@ class QuoridorApp:
                 self.local_player_id = int(message["player_id"])
                 self.online_room_id = str(message["room_id"])
                 self.online_seat_count = int(message.get("seat_count", 1))
+                self.online_max_players = int(message.get("max_players", 4))
                 self.scene = "online_lobby"
                 self.status = f"Joined room {self.online_room_id} as Player {self.local_player_id + 1}."
+            elif message_type == "player_joined":
+                self.online_seat_count = int(message.get("seat_count", self.online_seat_count))
             elif message_type == "game_started":
                 self.online_started = True
                 self.status = "All players are ready. Match starting..."
@@ -632,13 +641,17 @@ class QuoridorApp:
     def _draw_online_lobby(self) -> None:
         self._draw_text("Online Lobby", (470, 120), self.title_font)
         self._draw_text(f"Room: {self.online_room_id or '...'}", (470, 220), self.body_font)
-        self._draw_text(f"Seats joined: {self.online_seat_count}/4", (470, 260), self.body_font)
+        self._draw_text(f"Seats joined: {self.online_seat_count}/{self.online_max_players}", (470, 260), self.body_font)
         self._draw_text(
             f"Your seat: Player {(self.local_player_id + 1) if self.local_player_id is not None else '?'}",
             (470, 300),
             self.body_font,
         )
-        self._draw_text("When all 4 players have joined, each player presses Ready.", (330, 350), self.body_font)
+        self._draw_text(
+            f"When all {self.online_max_players} players have joined, each player presses Ready.",
+            (330, 350),
+            self.body_font,
+        )
         for button in self._online_lobby_buttons():
             self._draw_button(button)
 
@@ -746,7 +759,9 @@ class QuoridorApp:
         return buttons
 
     def _online_menu_buttons(self) -> list[Button]:
+        label = f"{self.online_num_players} Players"
         return [
+            Button(self.pg.Rect(520, 400, 300, 44), label, "toggle_players"),
             Button(self.pg.Rect(520, 470, 140, 44), "Join/Create", "join_online"),
             Button(self.pg.Rect(680, 470, 140, 44), "Back", "back_menu"),
         ]

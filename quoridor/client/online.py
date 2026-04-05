@@ -13,10 +13,11 @@ from quoridor.server.protocol import action_to_dict
 
 
 class OnlineSession:
-    def __init__(self, server_url: str, player_name: str, room_id: str) -> None:
+    def __init__(self, server_url: str, player_name: str, room_id: str, num_players: int = 4) -> None:
         self.server_url = server_url
         self.player_name = player_name
         self.room_id = room_id
+        self.num_players = num_players
         self._incoming: "queue.Queue[dict[str, Any]]" = queue.Queue()
         self._outgoing: "queue.Queue[dict[str, Any]]" = queue.Queue()
         self._stop = threading.Event()
@@ -46,6 +47,7 @@ class OnlineSession:
                             "type": "join_room",
                             "room_id": self.room_id,
                             "player_name": self.player_name,
+                            "num_players": self.num_players,
                         }
                     )
                 )

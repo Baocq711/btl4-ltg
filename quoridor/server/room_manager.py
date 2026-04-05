@@ -20,6 +20,7 @@ class RoomPlayer:
 @dataclass
 class Room:
     room_id: str
+    max_players: int = 4
     players: dict[int, RoomPlayer] = field(default_factory=dict)
     state: GameState | None = None
     started: bool = False
@@ -27,7 +28,7 @@ class Room:
     def join(self, player_name: str) -> RoomPlayer:
         if self.started:
             raise ValueError("Cannot join a room that has already started.")
-        if len(self.players) >= 4:
+        if len(self.players) >= self.max_players:
             raise ValueError("Room is full.")
 
         player_id = len(self.players)
@@ -39,10 +40,10 @@ class Room:
         if player_id not in self.players:
             raise ValueError("Player is not in this room.")
         self.players[player_id].ready = True
-        if len(self.players) == 4 and all(player.ready for player in self.players.values()):
+        if len(self.players) == self.max_players and all(player.ready for player in self.players.values()):
             self.started = True
-            kinds = ["remote"] * 4
-            self.state = create_initial_state(num_players=4, player_kinds=kinds, mode="ONLINE")
+            kinds = ["remote"] * self.max_players
+            self.state = create_initial_state(num_players=self.max_players, player_kinds=kinds, mode="ONLINE")
             return True
         return False
 
@@ -69,18 +70,18 @@ class RoomManager:
             if room_id not in self.rooms:
                 return room_id
 
-    def get_or_create(self, room_id: str | None = None) -> Room:
+    def get_or_create(self, room_id: str | None = None, max_players: int = 4) -> Room:
         clean_room_id = (room_id or "").strip().upper()
         if not clean_room_id:
             clean_room_id = self._generate_room_id()
         room = self.rooms.get(clean_room_id)
         if room is None:
-            room = Room(room_id=clean_room_id)
+            room = Room(room_id=clean_room_id, max_players=max_players)
             self.rooms[clean_room_id] = room
         return room
 
-    def join_room(self, room_id: str | None, player_name: str) -> tuple[Room, RoomPlayer]:
-        room = self.get_or_create(room_id)
+    def join_room(self, room_id: str | None, player_name: str, max_players: int = 4) -> tuple[Room, RoomPlayer]:
+        room = self.get_or_create(room_id, max_players=max_players)
         participant = room.join(player_name)
         return room, participant
 

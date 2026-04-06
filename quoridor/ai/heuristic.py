@@ -38,5 +38,5 @@ def evaluate_state(state: GameState, player_id: int) -> float:
         + 2.0 * my_player.walls_left
         + 0.75 * mobility
         + 0.35 * center_score
-        - 1.5 * danger
+        - 3.0 * danger
     )

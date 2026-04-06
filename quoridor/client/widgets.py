@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+def truncate_text(font: object, text: str, max_width: int, ellipsis: str = "...") -> str:
+    """Return *text* truncated so that it fits within *max_width* pixels."""
+    if font.size(text)[0] <= max_width:
+        return text
+    ell_w = font.size(ellipsis)[0]
+    while text and font.size(text)[0] + ell_w > max_width:
+        text = text[:-1]
+    return text + ellipsis
 
 
 @dataclass
@@ -22,6 +32,7 @@ class TextInput:
     name: str
     active: bool = False
     selected: bool = False
+    max_length: int = 30
 
     def set_active(self, active: bool, select_all: bool = False) -> None:
         self.active = active
@@ -40,6 +51,8 @@ class TextInput:
             self.value = text
         else:
             self.value += text
+        if self.max_length and len(self.value) > self.max_length:
+            self.value = self.value[: self.max_length]
         self.selected = False
 
     def paste_text(self, text: str) -> None:

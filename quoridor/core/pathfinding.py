@@ -49,7 +49,20 @@ def shortest_path(state: GameState, player_id: int) -> list[Position] | None:
 
 
 def shortest_path_len(state: GameState, player_id: int) -> int | None:
-    path = shortest_path(state, player_id)
-    if path is None:
-        return None
-    return len(path) - 1
+    """BFS that returns only the distance, without constructing the path."""
+    player = state.get_player(player_id)
+    start = player.pos
+    queue = deque([(start, 0)])
+    visited: set[Position] = {start}
+
+    while queue:
+        current, dist = queue.popleft()
+        if is_goal_reached(current, player.goal, state.board_size):
+            return dist
+        for nxt in neighbors_without_players(state, current):
+            if nxt in visited:
+                continue
+            visited.add(nxt)
+            queue.append((nxt, dist + 1))
+
+    return None

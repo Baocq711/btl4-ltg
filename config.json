@@ -1,4 +1,4 @@
 {
-  "server_url": "ws://127.0.0.1:8765",
+  "server_url": "wss://140e-113-161-74-84.ngrok-free.app",
   "player_name": "Player"
 }

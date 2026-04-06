@@ -32,7 +32,7 @@ from quoridor.client.config import (
 )
 from quoridor.client.manual_action_worker import ManualActionWorker
 from quoridor.client.online import OnlineSession
-from quoridor.client.widgets import Button, TextInput
+from quoridor.client.widgets import Button, TextInput, truncate_text
 from quoridor.core import (
     DEFAULT_SAVE_PATH,
     GameState,
@@ -719,6 +719,7 @@ class QuoridorApp:
             self.pg.draw.circle(self.screen, color, (HUD_X + 36, y + 14), 10)
             control = "You" if self.online_session is not None and player.id == self.local_player_id else player.kind
             label = f"P{player.id + 1}: ({player.pos.x}, {player.pos.y})  walls={player.walls_left}  {control}"
+            label = truncate_text(self.small_font, label, 320 - 58 - 12)
             self._draw_text(label, (HUD_X + 58, y), self.small_font)
             y += 36
 
@@ -738,7 +739,8 @@ class QuoridorApp:
 
     def _draw_footer_status(self) -> None:
         color = WARNING if "error" in self.status.lower() else TEXT
-        self._draw_text(self.status, (48, 710), self.small_font, color)
+        status = truncate_text(self.small_font, self.status, WINDOW_WIDTH - 96)
+        self._draw_text(status, (48, 710), self.small_font, color)
 
     def _menu_buttons(self) -> list[Button]:
         labels = [

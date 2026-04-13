@@ -81,6 +81,7 @@ PRESETS = {
     "vs_random": LocalPreset("Human vs Random", 2, ["human", "random"], "LOCAL_AI"),
     "vs_minimax": LocalPreset("Human vs Minimax", 2, ["human", "minimax"], "LOCAL_AI"),
     "vs_mcts": LocalPreset("Human vs 3x MCTS", 4, ["human", "mcts", "mcts", "mcts"], "LOCAL_AI"),
+    "vs_neural": LocalPreset("Human vs Neural", 2, ["human", "neural"], "LOCAL_AI"),
 }
 
 
@@ -749,6 +750,7 @@ class QuoridorApp:
             ("Vs Random", "vs_random"),
             ("Vs Minimax", "vs_minimax"),
             ("Vs MCTS", "vs_mcts"),
+            ("Vs Neural", "vs_neural"),
             ("Continue", "continue"),
             ("Online", "online"),
             ("Quit", "quit"),

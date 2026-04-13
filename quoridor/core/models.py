@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 Goal = Literal["TOP", "BOTTOM", "LEFT", "RIGHT"]
-PlayerKind = Literal["human", "random", "mcts", "minimax", "remote"]
+PlayerKind = Literal["human", "random", "mcts", "minimax", "neural", "remote"]
 
 
 @dataclass(frozen=True)

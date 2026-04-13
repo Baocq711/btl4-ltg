@@ -6,7 +6,7 @@ import queue
 import threading
 from dataclasses import dataclass
 
-from quoridor.ai import choose_mcts_action, choose_minimax_action, choose_random_action
+from quoridor.ai import choose_mcts_action, choose_minimax_action, choose_neural_action, choose_random_action
 from quoridor.core import Action, GameState
 
 
@@ -67,4 +67,6 @@ def choose_ai_action(state: GameState) -> Action:
         return choose_minimax_action(state, state.current_turn, depth=2)
     if player.kind == "mcts":
         return choose_mcts_action(state, state.current_turn, iterations=300, time_budget=1.0, rollout_depth=20)
+    if player.kind == "neural":
+        return choose_neural_action(state, state.current_turn)
     raise ValueError(f"Player kind '{player.kind}' is not AI-controlled.")

@@ -7,7 +7,7 @@ DEFAULT_SAVE_PATH = "saves/latest_local_game.json"
 
 ORIENTATIONS = {"H", "V"}
 GOALS = {"TOP", "BOTTOM", "LEFT", "RIGHT"}
-PLAYER_KINDS = {"human", "random", "mcts", "minimax", "remote"}
+PLAYER_KINDS = {"human", "random", "mcts", "minimax", "neural", "remote"}
 
 DIRECTIONS = {
     "UP": (0, -1),
